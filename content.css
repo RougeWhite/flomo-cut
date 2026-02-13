@@ -1,0 +1,109 @@
+/* 内容选取相关样式 */
+
+/* 顶部提示框 */
+.selection-top-bar {
+  position: fixed;
+  top: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 12px 20px;
+  border-radius: 20px;
+  font-size: 14px;
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  user-select: none;
+}
+
+/* 确认选取按钮 */
+.confirm-selection-btn {
+  background-color: #52c41a;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+  margin-left: auto;
+}
+
+.confirm-selection-btn:hover {
+  background-color: #389e0d;
+  transform: translateY(-1px);
+}
+
+.confirm-selection-btn:active {
+  background-color: #237804;
+  transform: translateY(0);
+}
+
+/* 鼠标悬停元素的虚线边框 */
+.hover-element {
+  outline: 2px dashed #52c41a !important;
+  outline-offset: 2px;
+  z-index: 9999 !important;
+  transition: outline 0.1s ease;
+}
+
+/* 选中元素的实线边框 */
+.selected-element {
+  outline: 2px solid #52c41a !important;
+  outline-offset: 2px;
+  background-color: rgba(144, 238, 144, 0.1) !important;
+  z-index: 9999 !important;
+  transition: outline 0.1s ease;
+  position: relative;
+}
+
+/* 选取模式下防止选中内容时的默认选中文本样式 */
+.selection-mode ::selection {
+  background-color: transparent;
+}
+
+.selection-mode ::-moz-selection {
+  background-color: transparent;
+}
+
+/* 截图容器（用于隐藏原始内容，显示截图） */
+.screenshot-container {
+  display: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10000;
+  background-color: white;
+}
+
+/* 保存成功通知 */
+.save-notification {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 16px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  z-index: 10002;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  animation: fadeInOut 3s ease-in-out forwards;
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translate(-50%, -50%) translateY(-20px); }
+  10% { opacity: 1; transform: translate(-50%, -50%) translateY(0); }
+  90% { opacity: 1; transform: translate(-50%, -50%) translateY(0); }
+  100% { opacity: 0; transform: translate(-50%, -50%) translateY(-20px); }
+}
