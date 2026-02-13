@@ -36,30 +36,47 @@
 4. 输入你的 flomo API Key（获取方式：登录 flomo -> 设置 -> API -> 复制 API Key）
 5. 点击「保存」按钮
 
+   <img width="390" height="790" alt="image" src="https://github.com/user-attachments/assets/b425a2ed-6bfa-43de-aa89-807003ffef17" />
+   
+   <img width="386" height="779" alt="image" src="https://github.com/user-attachments/assets/a2e4a4fb-ebd8-4f9d-b912-4ea40152d942" />
+
 ### 2. 选取内容
-1. 在侧边栏中点击「选 取」按钮
-2. 鼠标会变成十字形状，移动到你想要选取的内容上
-3. 点击鼠标左键选取内容，被选中的内容会显示绿色边框
-4. 按 Enter 键或点击顶部的「确认选取」按钮完成选取
-5. 选取的内容会显示在侧边栏中
+1. 在任何一个网页使用浏览器插件
+2. 点击「选 取」按钮
+3. 鼠标会变成十字形状，移动到你想要选取的内容上
+4. 绿色虚线框待选中，点击确认后变成绿色区域
+5. 按下回车↩︎完成选取
+6. 选取的内容会显示在侧边栏中
+
+   <img width="417" height="138" alt="image" src="https://github.com/user-attachments/assets/e0395e4e-59bd-4a93-8ad1-80e768ece40c" />
 
 ### 3. 获取全文
 1. 在侧边栏中点击「全 文」按钮
 2. 插件会自动获取当前网页的全部文本内容
 3. 内容会显示在侧边栏中
 
+   <img width="389" height="162" alt="image" src="https://github.com/user-attachments/assets/519e89f4-e782-40d3-81cf-e7efd7bc4156" />
+   
+   <img width="389" height="116" alt="image" src="https://github.com/user-attachments/assets/d5712198-2231-4f8d-b7b7-33752ccfb4c2" />
+
 ### 4. 添加标签
 1. 点击侧边栏底部的「添加标签」按钮
 2. 在弹出的输入框中输入标签名称
-3. 按 Enter 键添加标签
+3. 按下回车自动添加标签
 4. 标签会显示在内容区域上方
 5. 最多支持添加10个标签
+
+   <img width="392" height="896" alt="image" src="https://github.com/user-attachments/assets/86c2a6d2-0480-44fd-90c4-bb265fca3e94" />
 
 ### 5. 保存到 flomo
 1. 确认侧边栏中显示的内容无误
 2. 点击底部的「保 存」按钮
 3. 保存成功后会显示「保存成功」的通知
 4. 内容会自动保存到你的 flomo 账号中
+
+## 插件地址
+
+**GitHub 仓库：** [https://github.com/RougeWhite/flomo-cut](https://github.com/RougeWhite/flomo-cut)
 
 ## 技术实现
 

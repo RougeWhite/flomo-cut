@@ -90,7 +90,7 @@ function createTopBar() {
   topBar = document.createElement('div');
   topBar.className = 'selection-top-bar';
   topBar.innerHTML = `
-    <span>点击区域选中，再次点击取消选中，ESC 完成，↩︎ 完成</span>
+    <span>点击区域选中，再次点击取消选中，ESC 取消，↩︎ 完成</span>
     <button class="confirm-selection-btn" style="display: none;">确认选取 (0)</button>
   `;
   document.body.appendChild(topBar);
@@ -188,8 +188,11 @@ function removeGlobalClickBlocker() {
 
 // 处理键盘事件
 function handleKeyDown(e) {
-  if (e.key === 'Escape' || e.key === 'Enter') {
-    // 如果有选中元素，确认选取；否则退出选取模式
+  if (e.key === 'Escape') {
+    // ESC 键：取消并退出选取模式
+    exitSelectionMode();
+  } else if (e.key === 'Enter') {
+    // Enter 键：如果有选中元素，确认选取；否则退出选取模式
     if (selectedElements.length > 0) {
       handleConfirmSelection();
     } else {
