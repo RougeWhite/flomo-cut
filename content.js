@@ -5,6 +5,7 @@ let selectedElements = [];
 let topBar = null;
 let confirmBtn = null;
 let hoveredElement = null;
+let isSendingMessage = false; // 防止重复发送消息的标志
 
 // 监听来自侧边栏的消息
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -203,10 +204,18 @@ function handleKeyDown(e) {
 
 // 处理确认选取事件
 async function handleConfirmSelection() {
+  // 防止重复发送
+  if (isSendingMessage) {
+    console.log('正在发送消息，忽略重复请求');
+    return;
+  }
+  
   if (selectedElements.length === 0) {
     exitSelectionMode();
     return;
   }
+  
+  isSendingMessage = true; // 设置发送标志
   
   try {
     // 收集所有图片 URL，最多 9 张
@@ -219,9 +228,9 @@ async function handleConfirmSelection() {
       // 提取元素中的图片链接
       const images = extractImages(element);
       if (images.length > 0) {
-        // 只添加未超过 9 张的图片
+        // 只添加未超过 9 张的图片，并且避免重复
         images.forEach(imgUrl => {
-          if (allImages.length < 9) {
+          if (allImages.length < 9 && !allImages.includes(imgUrl)) {
             allImages.push(imgUrl);
             // 以图片形式展示，而不是标记
             content += `\n<img src="${imgUrl}" style="max-width: 100%; height: auto; margin: 8px 0; border-radius: 4px;">`;
@@ -269,6 +278,11 @@ async function handleConfirmSelection() {
       } 
     });
   } finally {
+    // 延迟重置发送标志，确保消息不会被重复发送
+    setTimeout(() => {
+      isSendingMessage = false;
+    }, 200);
+    
     // 退出选取模式
     exitSelectionMode();
   }

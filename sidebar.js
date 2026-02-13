@@ -64,6 +64,14 @@ fullTextBtn.addEventListener('click', () => {
   });
 });
 
+// 移除内容中的 img 标签并用【】包裹 URL
+function processImageTags(content) {
+  // 使用正则表达式匹配 img 标签
+  return content.replace(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi, (match, url) => {
+    return `【${url}】`;
+  });
+}
+
 // 保存按钮点击事件
 saveBtn.addEventListener('click', () => {
   // 检查按钮是否禁用
@@ -103,10 +111,13 @@ saveBtn.addEventListener('click', () => {
     }
   });
   
+  // 处理内容中的图片标签：移除 img 标签并用【】包裹 URL
+  const processedContent = processImageTags(content);
+  
   // 如果有标签，添加到内容前面
-  let finalContent = content;
+  let finalContent = processedContent;
   if (tagsText) {
-    finalContent = tagsText + '\n\n' + content;
+    finalContent = tagsText + '\n\n' + processedContent;
   }
   
   // 构建请求体
@@ -182,8 +193,22 @@ function showSaveNotification(message = '保存成功') {
 // 存储图片 URL 数组
 let storedImageUrls = [];
 
+// 消息去重机制
+let lastMessageTime = 0;
+let lastMessageAction = '';
+const MESSAGE_DEBOUNCE_TIME = 100; // 100毫秒去重时间
+
 // 监听来自内容脚本的消息
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // 消息去重检查
+  const currentTime = Date.now();
+  if (message.action === lastMessageAction && (currentTime - lastMessageTime) < MESSAGE_DEBOUNCE_TIME) {
+    console.log('重复消息被过滤:', message.action);
+    return;
+  }
+  lastMessageTime = currentTime;
+  lastMessageAction = message.action;
+  
   if (message.action === 'selectionComplete') {
     let fullContent = '';
     const pageInfo = message.pageInfo;
