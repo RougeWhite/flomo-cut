@@ -1,15 +1,20 @@
 {
   "manifest_version": 3,
-  "name": "flomo-剪纸",
+  "name": "IMA笔记",
   "version": "1.0",
-  "description": "选取网页内容并保存到本地服务器",
+  "description": "选取网页内容并保存到 IMA 知识库",
   "permissions": [
     "activeTab",
     "scripting",
-    "sidePanel"
+    "sidePanel",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://ima.qq.com/*",
+    "https://*.myqcloud.com/*"
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; img-src * data: blob:;"
+    "extension_pages": "script-src 'self'; object-src 'self'; img-src * data: blob:; connect-src https://ima.qq.com https://*.myqcloud.com;"
   },
   "background": {
     "service_worker": "background.js"
@@ -36,5 +41,11 @@
   },
   "side_panel": {
     "default_path": "sidebar.html"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["marked.min.js", "code.svg", "author.jpg", "wx.jpg", "zfb.jpg"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }

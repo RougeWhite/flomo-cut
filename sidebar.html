@@ -3,61 +3,79 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>笔记</title>
+  <title>IMA笔记</title>
   <link rel="stylesheet" href="sidebar.css">
 </head>
 <body>
   <div class="sidebar-container">
-    <div class="header">
-      <h1 class="title">剪纸</h1>
-      <div class="menu-container">
-        <button id="menu-btn" class="menu-btn">☰</button>
-        <div id="menu-dropdown" class="menu-dropdown">
-          <div class="menu-item" id="config-api-key">配置 flomo API</div>
-          <div class="menu-item" id="about-author">关于作者</div>
-        </div>
+    <div class="top-bar">
+      <div class="button-group">
+        <button id="select-btn" class="btn active"><img src="选取.svg" class="btn-icon">选 取</button>
+        <button id="full-text-btn" class="btn"><img src="全文.svg" class="btn-icon">全 文</button>
       </div>
+      <button id="menu-btn" class="menu-btn">☰</button>
+    </div>
+    <div class="top-divider"></div>
+    <div id="menu-dropdown" class="menu-dropdown">
+      <div class="menu-item" id="config-ima">配置 IMA API</div>
+      <div class="menu-item" id="refresh-kb">刷新知识库</div>
+      <div class="menu-item" id="settings">设置</div>
+      <div class="menu-item" id="about-author">关于作者</div>
     </div>
     
-    <!-- API Key 配置模态框 -->
-    <div id="api-key-modal" class="modal">
+    <!-- API 配置模态框 -->
+    <div id="api-modal" class="modal">
       <div class="modal-content">
         <div class="modal-header">
-          <h3>配置 flomo API</h3>
+          <h3>配置 IMA API</h3>
           <button id="close-modal" class="close-btn">&times;</button>
         </div>
         <div class="modal-body">
-          <label for="api-key-input">请输入 flomo API</label>
-          <textarea id="api-key-input" class="api-key-input" rows="3" placeholder="本插件需要使用 flomo API 才能正常工作，需要开通 flomo plus 才能正常使用，并且不会上传共享您的 API 请放心使用"></textarea>
+          <div class="form-group">
+            <label for="api-key-input">API Key</label>
+            <input type="password" id="api-key-input" class="api-input" placeholder="请输入 API Key">
+          </div>
+          <div class="form-group">
+            <label for="client-id-input">Client ID</label>
+            <input type="text" id="client-id-input" class="api-input" placeholder="请输入 Client ID">
+          </div>
+          <p class="api-hint">
+            获取方式：打开 <a href="https://ima.qq.com/agent-interface" target="_blank">ima.qq.com/agent-interface</a> 
+            获取 Client ID 和 API Key
+          </p>
         </div>
         <div class="modal-footer">
-          <button id="cancel-api-key" class="btn-secondary">取消</button>
-          <button id="save-api-key" class="btn-primary">保存</button>
+          <button id="quick-config-btn" class="btn-secondary">一键配置</button>
+          <div class="modal-footer-right">
+            <button id="cancel-api" class="btn-secondary">取消</button>
+            <button id="save-api" class="btn-primary">保存</button>
+          </div>
         </div>
       </div>
     </div>
-    <div class="button-group">
-      <button id="select-btn" class="btn active"><img src="选取.svg" class="btn-icon">选 取</button>
-      <button id="full-text-btn" class="btn"><img src="全文.svg" class="btn-icon">全 文</button>
-    </div>
+    
     <div class="content-area-container">
-      <div id="content-area" class="content-area" contenteditable="true">输入内容...</div>
-      <button id="clear-content-btn" class="clear-content-btn">清空</button>
-    </div>
-    
-    <!-- 标签容器 -->
-    <div id="tags-container" class="tags-container"></div>
-    
-    <!-- 标签输入框 -->
-    <div id="tag-input-container" class="tag-input-container" style="display: none;">
-      <div class="tag-input-wrapper">
-        <input type="text" id="tag-input" class="tag-input" placeholder="输入标签名称，↩︎回车自动添加">
-        <button id="tag-input-close" class="tag-input-close">&times;</button>
+      <textarea id="md-source" class="md-source" contenteditable="true"></textarea>
+      <div id="content-preview" class="content-preview" style="display: none;"></div>
+      <div class="content-toolbar">
+        <button id="toggle-md-btn" class="toggle-md-btn" title="Markdown 预览">
+          <svg class="code-icon" viewBox="0 0 1024 1024">
+            <path d="M246.72 327.296c-12.032-12.032-31.424-12.032-43.456 0L9.024 521.344c-12.032 11.968-12.032 31.36 0 43.392l194.304 194.048c12.032 11.968 31.424 11.968 43.456 0 12.032-12.032 12.032-31.36 0-43.392L74.112 543.04l172.608-172.416C258.752 358.656 258.752 339.264 246.72 327.296zM954.368 521.344l-194.304-194.048c-12.032-12.032-31.488-12.032-43.456 0-12.032 11.968-12.032 31.36 0 43.328l172.608 172.416-172.608 172.352c-12.032 12.032-12.032 31.36 0 43.392 11.968 11.968 31.424 11.968 43.456 0l194.304-194.048C966.4 552.768 966.4 533.312 954.368 521.344zM689.664 132.608c-15.296-8.96-34.88-3.648-43.712 11.84l-384 766.848c-8.896 15.424-3.648 35.2 11.712 44.032 15.296 8.96 34.88 3.648 43.776-11.84l383.936-766.848C710.272 161.28 705.024 141.504 689.664 132.608z"/>
+          </svg>
+        </button>
+        <div id="unlock-popup" class="unlock-popup" style="display: none;">
+          <span id="mode-hint" class="mode-hint"></span>
+        </div>
+        <button id="clear-content-btn" class="clear-content-btn">清空</button>
       </div>
     </div>
     
     <div class="bottom-buttons">
-      <button id="add-tag-btn" class="add-tag-btn">添加标签</button>
+      <div class="kb-selector-wrapper">
+        <select id="kb-selector" class="kb-selector">
+          <option value="">请先配置 IMA API</option>
+        </select>
+      </div>
       <button id="save-btn" class="save-btn">保 存</button>
     </div>
     
@@ -87,9 +105,29 @@
     
     <!-- 自定义提示组件 -->
     <div id="custom-alert" class="custom-alert" style="display: none;">
-      最多只能添加10个标签
+    </div>
+    
+    <!-- 一键配置弹窗 -->
+    <div id="quick-config-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>一键配置</h3>
+          <button id="close-quick-config" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p class="quick-config-hint">粘贴从 IMA 平台复制的凭证信息：</p>
+          <textarea id="credential-input" class="credential-input" placeholder="API Key: xxx
+Client ID: xxx"></textarea>
+          <p class="quick-config-hint-bottom">格式示例：<br>API Key: 3rQPzaVTwpHOHLQc1lv/T2Z3...<br>Client ID: cf4b0a2132145c41aad41a6617d423eb</p>
+        </div>
+        <div class="modal-footer">
+          <button id="get-credential-btn" class="btn-secondary">获取凭证</button>
+          <button id="apply-quick-config" class="btn-primary">应用</button>
+        </div>
+      </div>
     </div>
   </div>
+  <script src="marked.min.js"></script>
   <script src="sidebar.js"></script>
 </body>
 </html>

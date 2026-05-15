@@ -1,50 +1,101 @@
-// 侧边栏交互逻辑
+// IMA 笔记插件 - 侧边栏交互逻辑
 
-// 按钮元素
+// IMA API 配置
+const IMA_API_BASE = 'https://ima.qq.com';
+const IMA_API_PATHS = {
+  LIST_KB: '/openapi/wiki/v1/search_knowledge_base',
+  ADD_KNOWLEDGE: '/openapi/wiki/v1/add_knowledge',
+  IMPORT_DOC: '/openapi/note/v1/import_doc'
+};
+
+// DOM 元素
 const selectBtn = document.getElementById('select-btn');
 const fullTextBtn = document.getElementById('full-text-btn');
 const saveBtn = document.getElementById('save-btn');
-const contentArea = document.getElementById('content-area');
+const mdSource = document.getElementById('md-source');
+const contentPreview = document.getElementById('content-preview');
 const menuBtn = document.getElementById('menu-btn');
 const menuDropdown = document.getElementById('menu-dropdown');
-const configApiKeyItem = document.getElementById('config-api-key');
-// API Key 模态框元素
-const apiKeyModal = document.getElementById('api-key-modal');
+const apiModal = document.getElementById('api-modal');
+const clientIdInput = document.getElementById('client-id-input');
 const apiKeyInput = document.getElementById('api-key-input');
 const closeModalBtn = document.getElementById('close-modal');
-const cancelApiKeyBtn = document.getElementById('cancel-api-key');
-const saveApiKeyBtn = document.getElementById('save-api-key');
-// 标签相关元素
-const addTagBtn = document.getElementById('add-tag-btn');
-const tagInputContainer = document.getElementById('tag-input-container');
-const tagInput = document.getElementById('tag-input');
-const tagInputClose = document.getElementById('tag-input-close');
-const tagsContainer = document.getElementById('tags-container');
+const cancelApiBtn = document.getElementById('cancel-api');
+const saveApiBtn = document.getElementById('save-api');
+const configImaItem = document.getElementById('config-ima');
+const refreshKbItem = document.getElementById('refresh-kb');
+const settingsItem = document.getElementById('settings');
+const kbSelector = document.getElementById('kb-selector');
 const customAlert = document.getElementById('custom-alert');
-// 清空按钮
 const clearContentBtn = document.getElementById('clear-content-btn');
-// 作者信息模态框元素
+const unlockPopup = document.getElementById('unlock-popup');
+const modeHint = document.getElementById('mode-hint');
 const aboutAuthorItem = document.getElementById('about-author');
 const authorModal = document.getElementById('author-modal');
 const closeAuthorModalBtn = document.getElementById('close-author-modal');
 const closeAuthorBtn = document.getElementById('close-author-btn');
-// 获取 menuContainer 元素
-const menuContainer = document.querySelector('.menu-container');
-// 标签颜色数组
-const tagColors = [
-  { bg: '#e6f7ff', color: '#1890ff' },
-  { bg: '#f6ffed', color: '#52c41a' },
-  { bg: '#fffbe6', color: '#faad14' },
-  { bg: '#fff1f0', color: '#f5222d' },
-  { bg: '#f9f0ff', color: '#722ed1' }
-];
+const quickConfigBtn = document.getElementById('quick-config-btn');
+const quickConfigModal = document.getElementById('quick-config-modal');
+const closeQuickConfigBtn = document.getElementById('close-quick-config');
+const credentialInput = document.getElementById('credential-input');
+const applyQuickConfigBtn = document.getElementById('apply-quick-config');
+const getCredentialBtn = document.getElementById('get-credential-btn');
+const toggleMdBtn = document.getElementById('toggle-md-btn');
+
+// Markdown 编辑状态
+let isMdMode = false;
+
+// 消息去重
+let lastMessageTime = 0;
+let lastMessageAction = '';
+const MESSAGE_DEBOUNCE_TIME = 100;
+
+// 获取 IMA 凭证
+function getImaCredentials() {
+  return {
+    clientId: localStorage.getItem('imaClientId') || '',
+    apiKey: localStorage.getItem('imaApiKey') || ''
+  };
+}
+
+// 检查是否已配置
+function isConfigured() {
+  const creds = getImaCredentials();
+  return creds.clientId && creds.apiKey;
+}
+
+// IMA API 调用
+async function imaApi(apiPath, body) {
+  const creds = getImaCredentials();
+  
+  if (!creds.clientId || !creds.apiKey) {
+    throw new Error('请先配置 IMA API');
+  }
+
+  const response = await fetch(`${IMA_API_BASE}${apiPath}`, {
+    method: 'POST',
+    headers: {
+      'ima-openapi-clientid': creds.clientId,
+      'ima-openapi-apikey': creds.apiKey,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+
+  const data = await response.json();
+  
+  if (data.code !== 0) {
+    throw new Error(data.msg || 'API 调用失败');
+  }
+  
+  return data;
+}
 
 // 按钮状态切换
 selectBtn.addEventListener('click', () => {
   selectBtn.classList.add('active');
   fullTextBtn.classList.remove('active');
   
-  // 发送消息给内容脚本，开始选取模式
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (tabs[0]) {
       chrome.tabs.sendMessage(tabs[0].id, { action: 'startSelection' });
@@ -56,7 +107,6 @@ fullTextBtn.addEventListener('click', () => {
   fullTextBtn.classList.add('active');
   selectBtn.classList.remove('active');
   
-  // 发送消息给内容脚本，获取全文
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (tabs[0]) {
       chrome.tabs.sendMessage(tabs[0].id, { action: 'getFullText' });
@@ -64,123 +114,211 @@ fullTextBtn.addEventListener('click', () => {
   });
 });
 
-// 移除内容中的 img 标签并用【】包裹 URL
-function processImageTags(content) {
-  // 使用正则表达式匹配 img 标签
-  return content.replace(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi, (match, url) => {
-    return `【${url}】`;
+// 保存按钮点击事件
+saveBtn.addEventListener('click', async () => {
+  if (saveBtn.disabled) return;
+  
+  if (!isConfigured()) {
+    showCustomAlert('请先配置 IMA API');
+    apiModal.classList.add('show');
+    return;
+  }
+  
+  const kbId = kbSelector.value;
+  if (!kbId) {
+    showCustomAlert('请选择知识库');
+    return;
+  }
+  
+  const content = mdSource.value;
+  if (!content || !content.trim()) {
+    showCustomAlert('请先输入内容');
+    return;
+  }
+  
+  saveBtn.disabled = true;
+  saveBtn.textContent = '保存中...';
+  
+  try {
+    await createNote(content, kbId);
+    
+    showSaveNotification('保存成功');
+    mdSource.value = '';
+    localStorage.removeItem('draftMdSource');
+    updateSaveButtonState();
+  } catch (error) {
+    console.error('保存失败:', error);
+    showCustomAlert(error.message || '保存失败');
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = '保 存';
+  }
+});
+
+// 创建笔记
+async function createNote(content, kbId) {
+  // content 已经是 Markdown 格式
+  const mdContent = content;
+  
+  // 生成标题
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  const title = `# ${year}年${month}月${day}日 ${hours}:${minutes}:${seconds} 剪藏的内容\n\n`;
+  
+  // Step 1: 创建笔记到个人笔记本
+  const importResponse = await imaApi(IMA_API_PATHS.IMPORT_DOC, {
+    content_format: 1,
+    content: title + mdContent
+  });
+  
+  const noteId = importResponse.data.note_id;
+  console.log('笔记创建成功, note_id:', noteId);
+  
+  // Step 2: 将笔记添加到知识库
+  if (kbId && noteId) {
+    await addNoteToKnowledgeBase(kbId, noteId, title + mdContent);
+  }
+  
+  return importResponse;
+}
+
+// 将笔记添加到知识库
+async function addNoteToKnowledgeBase(kbId, noteId, content) {
+  // 从内容中提取标题（第一行）
+  const titleMatch = content.match(/^#\s*(.+)$/m);
+  const title = titleMatch ? titleMatch[1].trim() : '无标题笔记';
+  
+  await imaApi(IMA_API_PATHS.ADD_KNOWLEDGE, {
+    media_type: 11,
+    note_info: {
+      content_id: noteId
+    },
+    title: title,
+    knowledge_base_id: kbId
+  });
+  
+  console.log('笔记已添加到知识库:', kbId);
+}
+
+// 解码 HTML 实体
+function decodeHTMLEntities(text) {
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = text;
+  return textarea.value;
+}
+
+// 从 localStorage 加载知识库缓存
+function loadKbFromCache() {
+  const cachedKb = localStorage.getItem('cachedKbList');
+  if (!cachedKb) return null;
+  
+  try {
+    const data = JSON.parse(cachedKb);
+    return data.kbList || [];
+  } catch {
+    return null;
+  }
+}
+
+// 保存知识库到 localStorage
+function saveKbToCache(kbList) {
+  const data = {
+    kbList: kbList,
+    timestamp: Date.now()
+  };
+  localStorage.setItem('cachedKbList', JSON.stringify(data));
+}
+
+// 渲染知识库列表
+function renderKbSelector(kbList) {
+  const lastSelectedKb = localStorage.getItem('selectedKbId') || '';
+  
+  if (kbList.length === 0) {
+    kbSelector.innerHTML = '<option value="">暂无知识库</option>';
+    return;
+  }
+  
+  kbSelector.innerHTML = '<option value="">选择知识库...</option>';
+  kbList.forEach(kb => {
+    const option = document.createElement('option');
+    option.value = kb.kb_id;
+    option.textContent = kb.kb_name;
+    if (kb.kb_id === lastSelectedKb) {
+      option.selected = true;
+    }
+    kbSelector.appendChild(option);
   });
 }
 
-// 保存按钮点击事件
-saveBtn.addEventListener('click', () => {
-  // 检查按钮是否禁用
-  if (saveBtn.disabled) {
+// 获取知识库列表
+async function fetchKnowledgeBases() {
+  if (!isConfigured()) {
+    kbSelector.innerHTML = '<option value="">请先配置 IMA API</option>';
     return;
   }
   
-  const content = contentArea.innerHTML;
-  if (!content || content === '输入内容...') {
-    alert('请先输入内容');
-    return;
+  // 优先从缓存加载
+  const cachedKbList = loadKbFromCache();
+  if (cachedKbList && cachedKbList.length > 0) {
+    renderKbSelector(cachedKbList);
+  } else {
+    kbSelector.innerHTML = '<option value="">加载中...</option>';
   }
   
-  // 获取 API Key
-  const apiKey = localStorage.getItem('apiKey') || '';
-  if (!apiKey) {
-    alert('请先配置 API Key');
-    return;
-  }
-  
-  // 构建请求 URL - 确保格式正确
-  let cleanApiKey = apiKey.trim();
-  // 移除可能的完整 URL 前缀，只保留路径部分
-  cleanApiKey = cleanApiKey.replace(/^https?:\/\/flomoapp\.com\/iwh\//, '');
-  // 移除末尾的斜杠
-  cleanApiKey = cleanApiKey.replace(/\/$/, '');
-  const url = `https://flomoapp.com/iwh/${cleanApiKey}/`;
-  
-  // 获取所有标签并格式化为 # 标签
-  let tagsText = '';
-  const tagItems = tagsContainer.querySelectorAll('.tag-item');
-  
-  tagItems.forEach((tagItem, index) => {
-    const tagName = tagItem.textContent.trim().replace('×', '').trim();
-    if (tagName) {
-      tagsText += `#${tagName} `;
+  // 异步获取最新数据
+  try {
+    const response = await imaApi(IMA_API_PATHS.LIST_KB, {
+      query: '',
+      cursor: '',
+      limit: 20
+    });
+    
+    const kbList = response.data.info_list || [];
+    
+    // 保存到缓存
+    saveKbToCache(kbList);
+    
+    // 渲染列表
+    renderKbSelector(kbList);
+    
+  } catch (error) {
+    console.error('获取知识库列表失败:', error);
+    // 如果缓存有数据，不显示错误，只保留缓存
+    if (!cachedKbList || cachedKbList.length === 0) {
+      kbSelector.innerHTML = '<option value="">获取失败</option>';
+      showCustomAlert('获取知识库列表失败: ' + error.message);
     }
-  });
-  
-  // 处理内容中的图片标签：移除 img 标签并用【】包裹 URL
-  const processedContent = processImageTags(content);
-  
-  // 如果有标签，添加到内容前面
-  let finalContent = processedContent;
-  if (tagsText) {
-    finalContent = tagsText + '\n\n' + processedContent;
   }
-  
-  // 构建请求体
-  const requestBody = {
-    content: finalContent,
-    image_urls: storedImageUrls // 添加图片 URL 数组
-  };
-  
-  // 发送POST请求到 flomo
-  fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(requestBody)
-  })
-  .then(response => {
-    if (!response.ok) {
-      throw new Error('网络响应错误');
-    }
-    return response.json();
-  })
-  .then(data => {
-    console.log('保存成功:', data);
-    showSaveNotification();
-    // 清空内容区域
-    contentArea.innerHTML = '输入内容...';
-    // 更新保存按钮状态
-    updateSaveButtonState();
-    // 保存标签到本地存储（带过期时间）
-    saveTagsToLocalStorage();
-  })
-  .catch(error => {
-    console.error('保存失败:', error);
-    alert('保存失败，请检查 API Key 是否正确');
-  });
+}
+
+// 监听知识库选择变化
+kbSelector.addEventListener('change', () => {
+  localStorage.setItem('selectedKbId', kbSelector.value);
 });
 
 // 显示保存成功通知
 function showSaveNotification(message = '保存成功') {
-  // 检查是否已有通知
   const existingNotification = document.querySelector('.save-notification');
   if (existingNotification) {
     existingNotification.remove();
   }
   
-  // 创建通知元素
   const notification = document.createElement('div');
   notification.className = 'save-notification';
   notification.textContent = message;
-  
-  // 添加到页面
   document.body.appendChild(notification);
   
-  // 3秒后添加退出动画并移除
   setTimeout(() => {
     if (notification.parentNode) {
-      // 添加退出动画类
       notification.style.transition = 'all 0.3s ease-out';
       notification.style.transform = 'translateX(-100%)';
       notification.style.opacity = '0';
       
-      // 动画结束后移除元素
       setTimeout(() => {
         if (notification.parentNode) {
           notification.parentNode.removeChild(notification);
@@ -190,17 +328,8 @@ function showSaveNotification(message = '保存成功') {
   }, 3000);
 }
 
-// 存储图片 URL 数组
-let storedImageUrls = [];
-
-// 消息去重机制
-let lastMessageTime = 0;
-let lastMessageAction = '';
-const MESSAGE_DEBOUNCE_TIME = 100; // 100毫秒去重时间
-
 // 监听来自内容脚本的消息
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // 消息去重检查
   const currentTime = Date.now();
   if (message.action === lastMessageAction && (currentTime - lastMessageTime) < MESSAGE_DEBOUNCE_TIME) {
     console.log('重复消息被过滤:', message.action);
@@ -213,280 +342,297 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     let fullContent = '';
     const pageInfo = message.pageInfo;
     
-    // 存储图片 URL 数组
-    storedImageUrls = message.image_urls || [];
-    
     if (message.selections) {
-          // 处理新的selections格式（移除截图显示）
-          message.selections.forEach(selection => {
-            // 只显示文字内容（如果有）
-            if (selection.textContent && selection.textContent.trim() !== '') {
-              fullContent += `<blockquote style="margin: 8px 0; padding: 12px; background-color: #f5f5f5; border-left: 4px solid #52c41a; border-radius: 0 4px 4px 0; font-style: italic; font-weight: bold;">${selection.textContent}</blockquote>`;
-              fullContent += '<br>';
-            }
-          });
-        } else if (message.content) {
-      // 兼容旧的content格式
-      fullContent += message.content;
+      message.selections.forEach(selection => {
+        if (selection.textContent && selection.textContent.trim() !== '') {
+          fullContent += `${selection.textContent}\n\n`;
+        }
+      });
     }
     
-    // 添加markdown格式的引用
     if (pageInfo) {
-      fullContent += `\n\n---\n来自：[${pageInfo.title}] |「URL」${pageInfo.url}`;
+      fullContent += `---\n\n> 来自：[${pageInfo.title}] |「URL」${pageInfo.url}`;
     }
     
-    // 将内容叠加到侧边栏
-    if (contentArea.innerHTML === '输入内容...' || !contentArea.innerHTML.trim()) {
-      // 如果是初始状态，直接设置内容
-      contentArea.innerHTML = fullContent;
-    } else {
-      // 否则追加内容
-      contentArea.innerHTML += fullContent;
+    // 检查追加前内容是否为空
+    const wasEmpty = !mdSource.value.trim();
+    
+    // 追加到 mdSource textarea
+    mdSource.value += fullContent;
+    
+    // 如果内容为空，切换到预览模式；否则保持当前状态
+    if (wasEmpty) {
+      isMdMode = true;
+      toggleMdBtn.classList.add('active');
+      mdSource.style.display = 'none';
+      contentPreview.style.display = 'block';
+      renderPreview();
+      
+      // 读取设置，根据设置决定是否显示提示
+      const settings = JSON.parse(localStorage.getItem('appSettings') || '{}');
+      if (settings.dblclickEdit === false) {
+        // 未开启双击切换，显示提示
+        setTimeout(() => {
+          showPreviewModeHint();
+        }, 300);
+      }
+    } else if (isMdMode) {
+      // 如果内容不为空且在预览模式，更新预览
+      renderPreview();
     }
+    
+    // 保存到 localStorage
+    localStorage.setItem('draftMdSource', mdSource.value);
   } else if (message.action === 'fullTextReceived') {
-    // 存储图片 URL 数组
-    storedImageUrls = message.image_urls || [];
-    
-    // 获取全文时覆盖现有内容
     let fullContent = message.content;
     
-    // 添加图片 HTML
     if (message.imagesHtml) {
       fullContent += message.imagesHtml;
     }
     
-    // 添加markdown格式的引用
     const pageInfo = message.pageInfo;
     if (pageInfo) {
-      fullContent += `\n\n---\n来自：[${pageInfo.title}] |「URL」${pageInfo.url}`;
+      fullContent += `\n\n---\n\n> 来自：[${pageInfo.title}] |「URL」${pageInfo.url}`;
     }
     
-    // 使用 innerHTML 而不是 textContent，确保图片能正确显示
-    contentArea.innerHTML = fullContent;
-  }
-});
-
-// 初始化内容区域点击事件，清除默认提示文字
-contentArea.addEventListener('focus', () => {
-  if (contentArea.innerHTML === '输入内容...') {
-    contentArea.innerHTML = '';
+    mdSource.value = fullContent;
+    
+    if (isMdMode) {
+      renderPreview();
+    }
+    
+    // 保存到 localStorage
+    localStorage.setItem('draftMdSource', mdSource.value);
   }
 });
 
 // 检查内容并更新保存按钮状态
 function updateSaveButtonState() {
-  const content = contentArea.innerHTML;
-  const hasContent = content && content !== '输入内容...' && content.trim() !== '';
+  const hasContent = mdSource.value.trim() !== '';
   saveBtn.disabled = !hasContent;
 }
 
-// 监听内容变化
-contentArea.addEventListener('input', updateSaveButtonState);
-contentArea.addEventListener('blur', updateSaveButtonState);
-contentArea.addEventListener('keyup', updateSaveButtonState);
-contentArea.addEventListener('paste', updateSaveButtonState);
-contentArea.addEventListener('cut', updateSaveButtonState);
-contentArea.addEventListener('keydown', updateSaveButtonState);
-contentArea.addEventListener('change', updateSaveButtonState);
+// 监听 mdSource 内容变化
+mdSource.addEventListener('input', updateSaveButtonState);
 
-// 为 contenteditable 元素添加 MutationObserver，监听内容变化
-const observer = new MutationObserver(updateSaveButtonState);
-observer.observe(contentArea, {
-  childList: true,
-  subtree: true,
-  characterData: true
+window.addEventListener('load', () => {
+  updateSaveButtonState();
+  fetchKnowledgeBases();
+  
+  // 恢复 mdSource textarea 内容
+  const cachedMdSource = localStorage.getItem('draftMdSource');
+  if (cachedMdSource) {
+    mdSource.value = cachedMdSource;
+  }
+  
+  // 更新按钮状态
+  if (mdSource.value) {
+    saveBtn.disabled = false;
+  }
 });
 
-// 页面加载时初始化保存按钮状态
-window.addEventListener('load', updateSaveButtonState);
+// 使用 marked.js 渲染 Markdown 源码到预览区
+function renderPreview() {
+  const mdText = mdSource.value;
+  if (!mdText.trim()) {
+    contentPreview.innerHTML = '';
+    return;
+  }
+  
+  const html = marked.parse(mdText);
+  contentPreview.innerHTML = `<div class="markdown-body">${html}</div>`;
+}
 
-// 菜单按钮点击事件
+// Markdown 模式切换（源码编辑 <-> 预览）
+toggleMdBtn.addEventListener('click', () => {
+  // 预览模式下点击直接切换
+  if (isMdMode) {
+    switchToEditMode();
+  } else {
+    // 编辑模式切换到预览模式
+    isMdMode = true;
+    toggleMdBtn.classList.add('active');
+    mdSource.style.display = 'none';
+    contentPreview.style.display = 'block';
+    renderPreview();
+  }
+});
+
+// 实时保存用户输入到 localStorage
+mdSource.addEventListener('input', () => {
+  localStorage.setItem('draftMdSource', mdSource.value);
+  
+  // 如果在预览模式，实时渲染
+  if (isMdMode) {
+    renderPreview();
+  }
+});
+
+// 显示预览模式切换提示
+function showPreviewModeHint() {
+  if (!isMdMode) return;
+  
+  // 移除之前的闪烁
+  toggleMdBtn.classList.remove('flash');
+  
+  // 添加闪烁效果
+  toggleMdBtn.classList.add('flash');
+  modeHint.textContent = '请点击左侧图片切换至编辑模式';
+  unlockPopup.style.display = 'block';
+  
+  // 3秒后自动隐藏
+  setTimeout(() => {
+    hidePreviewModeHint();
+  }, 3000);
+}
+
+function hidePreviewModeHint() {
+  toggleMdBtn.classList.remove('flash');
+  unlockPopup.style.display = 'none';
+}
+
+// 切换到编辑模式
+function switchToEditMode() {
+  isMdMode = false;
+  toggleMdBtn.classList.remove('active');
+  mdSource.style.display = 'block';
+  contentPreview.style.display = 'none';
+  mdSource.focus();
+  hidePreviewModeHint();
+}
+
+// toggleMdBtn 双击事件（预览模式下）
+toggleMdBtn.addEventListener('dblclick', (e) => {
+  if (!isMdMode) return;
+  
+  e.preventDefault();
+  switchToEditMode();
+});
+
+// 预览窗口双击事件
+contentPreview.addEventListener('dblclick', (e) => {
+  if (!isMdMode) return;
+  
+  // 读取设置
+  const settings = JSON.parse(localStorage.getItem('appSettings') || '{}');
+  
+  if (settings.dblclickEdit !== false) {
+    // 开启双击切换功能，直接切换到编辑模式
+    switchToEditMode();
+  } else {
+    // 未开启，显示提示
+    showPreviewModeHint();
+  }
+});
+
+// 提示气泡双击
+modeHint.addEventListener('dblclick', () => {
+  switchToEditMode();
+});
+
+// 点击其他地方隐藏提示
+document.addEventListener('click', (e) => {
+  if (unlockPopup.style.display === 'block') {
+    if (!toggleMdBtn.contains(e.target) && !unlockPopup.contains(e.target)) {
+      hidePreviewModeHint();
+    }
+  }
+});
+
+// 菜单按钮
 menuBtn.addEventListener('click', (e) => {
-  e.stopPropagation(); // 阻止事件冒泡
+  e.stopPropagation();
   menuDropdown.classList.toggle('show');
 });
 
-// 点击其他地方关闭菜单
 document.addEventListener('click', (e) => {
-  if (!menuContainer.contains(e.target)) {
+  if (!menuBtn.contains(e.target) && !menuDropdown.contains(e.target)) {
     menuDropdown.classList.remove('show');
   }
 });
 
-// 配置 API Key 菜单项点击事件
-configApiKeyItem.addEventListener('click', () => {
-  const currentApiKey = localStorage.getItem('apiKey') || '';
-  apiKeyInput.value = currentApiKey;
-  apiKeyModal.classList.add('show');
-  
-  // 关闭菜单
+// 设置
+settingsItem.addEventListener('click', () => {
+  const settingsUrl = chrome.runtime.getURL('settings.html');
+  chrome.tabs.create({ url: settingsUrl });
   menuDropdown.classList.remove('show');
+});
+
+// 配置 IMA API
+configImaItem.addEventListener('click', () => {
+  const creds = getImaCredentials();
+  clientIdInput.value = creds.clientId;
+  apiKeyInput.value = creds.apiKey;
+  apiModal.classList.add('show');
+  menuDropdown.classList.remove('show');
+});
+
+// 刷新知识库
+refreshKbItem.addEventListener('click', () => {
+  fetchKnowledgeBases();
+  menuDropdown.classList.remove('show');
+  showSaveNotification('知识库已刷新');
 });
 
 // 关闭模态框
-function closeApiKeyModal() {
-  apiKeyModal.classList.remove('show');
+function closeApiModal() {
+  apiModal.classList.remove('show');
 }
 
-// 关闭按钮点击事件
-closeModalBtn.addEventListener('click', closeApiKeyModal);
+closeModalBtn.addEventListener('click', closeApiModal);
+cancelApiBtn.addEventListener('click', closeApiModal);
 
-// 取消按钮点击事件
-cancelApiKeyBtn.addEventListener('click', closeApiKeyModal);
-
-// 保存按钮点击事件
-saveApiKeyBtn.addEventListener('click', () => {
-  const newApiKey = apiKeyInput.value.trim();
-  localStorage.setItem('apiKey', newApiKey);
-  
-  // 显示保存成功通知
-  showSaveNotification('API Key 已保存');
-  closeApiKeyModal();
-});
-
-// 点击模态框外部关闭
-apiKeyModal.addEventListener('click', (e) => {
-  if (e.target === apiKeyModal) {
-    closeApiKeyModal();
+apiModal.addEventListener('click', (e) => {
+  if (e.target === apiModal) {
+    closeApiModal();
   }
 });
 
-// 关于作者菜单项点击事件
+// 保存 API 配置
+saveApiBtn.addEventListener('click', () => {
+  const clientId = clientIdInput.value.trim();
+  const apiKey = apiKeyInput.value.trim();
+  
+  if (!clientId || !apiKey) {
+    showCustomAlert('请填写完整的 API 信息');
+    return;
+  }
+  
+  localStorage.setItem('imaClientId', clientId);
+  localStorage.setItem('imaApiKey', apiKey);
+  
+  showSaveNotification('API 配置已保存');
+  closeApiModal();
+  
+  // 刷新知识库列表
+  fetchKnowledgeBases();
+});
+
+// 关于作者
 aboutAuthorItem.addEventListener('click', () => {
   authorModal.classList.add('show');
-  // 关闭菜单下拉框
   menuDropdown.classList.remove('show');
 });
 
-// 关闭作者信息模态框
 function closeAuthorModal() {
   authorModal.classList.remove('show');
 }
 
-// 关闭作者信息模态框按钮点击事件
 closeAuthorModalBtn.addEventListener('click', closeAuthorModal);
 closeAuthorBtn.addEventListener('click', closeAuthorModal);
 
-// 点击作者信息模态框外部关闭
 authorModal.addEventListener('click', (e) => {
   if (e.target === authorModal) {
     closeAuthorModal();
   }
 });
 
-// 添加标签按钮点击事件
-addTagBtn.addEventListener('click', () => {
-  // 检查是否已经达到最大标签数量
-  const currentTags = tagsContainer.querySelectorAll('.tag-item');
-  if (currentTags.length >= 10) {
-    showCustomAlert('最多只能添加10个标签');
-    return;
-  }
-  
-  // 显示标签输入框
-  tagInputContainer.style.display = 'block';
-  tagInput.focus();
-});
-
-// 标签输入框回车事件
-tagInput.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') {
-    const tagName = tagInput.value.trim();
-    if (tagName) {
-      addTag(tagName);
-      tagInput.value = '';
-      // 不关闭输入框，保持打开状态
-    }
-  }
-});
-
-// 标签输入框关闭按钮点击事件
-tagInputClose.addEventListener('click', () => {
-  tagInputContainer.style.display = 'none';
-});
-
-// 点击其他地方关闭标签输入框
-document.addEventListener('click', (e) => {
-  // 检查是否点击了标签删除按钮或标签本身
-  if (e.target.classList.contains('tag-delete') || e.target.closest('.tag-item')) {
-    return;
-  }
-  
-  // 检查是否点击了标签输入框或添加标签按钮
-  if (!tagInputContainer.contains(e.target) && e.target !== addTagBtn) {
-    tagInputContainer.style.display = 'none';
-  }
-});
-
-// 添加标签函数
-function addTag(tagName) {
-  const currentTags = tagsContainer.querySelectorAll('.tag-item');
-  if (currentTags.length >= 10) {
-    showCustomAlert('最多只能添加10个标签');
-    return;
-  }
-  
-  // 创建标签元素
-  const tagItem = document.createElement('div');
-  tagItem.className = 'tag-item';
-  
-  // 随机选择标签颜色
-  const colorIndex = Math.floor(Math.random() * tagColors.length);
-  const color = tagColors[colorIndex];
-  tagItem.style.backgroundColor = color.bg;
-  tagItem.style.color = color.color;
-  
-  // 创建标签内容
-  tagItem.innerHTML = `
-    ${tagName}
-    <button class="tag-delete">&times;</button>
-  `;
-  
-  // 添加删除按钮点击事件
-  const deleteBtn = tagItem.querySelector('.tag-delete');
-  deleteBtn.addEventListener('click', function() {
-    deleteTag(this);
-  });
-  
-  // 添加到标签容器
-  tagsContainer.appendChild(tagItem);
-}
-
-// 删除标签函数
-function deleteTag(deleteBtn) {
-  const tagItem = deleteBtn.parentElement;
-  tagItem.style.animation = 'tagSlideOut 0.3s ease-out';
-  setTimeout(() => {
-    tagItem.remove();
-  }, 300);
-}
-
-// 添加标签退出动画
-const style = document.createElement('style');
-style.textContent = `
-@keyframes tagSlideOut {
-  from {
-    transform: translateY(0);
-    opacity: 1;
-  }
-  to {
-    transform: translateY(-10px);
-    opacity: 0;
-  }
-}
-`;
-document.head.appendChild(style);
-
-// 显示自定义提示函数
+// 自定义提示
 function showCustomAlert(message) {
-  // 设置提示消息
   customAlert.textContent = message;
-  
-  // 显示提示
   customAlert.style.display = 'flex';
   customAlert.style.animation = 'notificationSlideIn 0.3s ease-out';
   
-  // 3秒后隐藏提示
   setTimeout(() => {
     customAlert.style.transition = 'all 0.3s ease-out';
     customAlert.style.transform = 'translateX(-100%)';
@@ -501,85 +647,70 @@ function showCustomAlert(message) {
   }, 3000);
 }
 
-// 保存标签到本地存储（带过期时间）
-function saveTagsToLocalStorage() {
-  const tags = [];
-  const tagItems = tagsContainer.querySelectorAll('.tag-item');
-  
-  tagItems.forEach(tagItem => {
-    const tagName = tagItem.textContent.trim().replace('×', '').trim();
-    const bgColor = tagItem.style.backgroundColor;
-    const textColor = tagItem.style.color;
-    
-    tags.push({
-      name: tagName,
-      bgColor: bgColor,
-      textColor: textColor
-    });
-  });
-  
-  // 设置12小时过期时间
-  const expiryTime = Date.now() + (12 * 60 * 60 * 1000);
-  
-  const tagData = {
-    tags: tags,
-    expiry: expiryTime
-  };
-  
-  localStorage.setItem('savedTags', JSON.stringify(tagData));
-}
-
-// 从本地存储加载标签
-function loadTagsFromLocalStorage() {
-  const savedTagData = localStorage.getItem('savedTags');
-  if (!savedTagData) return;
-  
-  try {
-    const tagData = JSON.parse(savedTagData);
-    const currentTime = Date.now();
-    
-    // 检查是否过期
-    if (currentTime > tagData.expiry) {
-      localStorage.removeItem('savedTags');
-      return;
-    }
-    
-    // 加载标签
-    tagData.tags.forEach(tag => {
-      const tagItem = document.createElement('div');
-      tagItem.className = 'tag-item';
-      tagItem.style.backgroundColor = tag.bgColor;
-      tagItem.style.color = tag.textColor;
-      tagItem.innerHTML = `
-        ${tag.name}
-        <button class="tag-delete">&times;</button>
-      `;
-      
-      // 添加删除按钮点击事件
-      const deleteBtn = tagItem.querySelector('.tag-delete');
-      deleteBtn.addEventListener('click', function() {
-        deleteTag(this);
-      });
-      
-      tagsContainer.appendChild(tagItem);
-    });
-  } catch (error) {
-    console.error('加载标签失败:', error);
-    localStorage.removeItem('savedTags');
-  }
-}
-
-// 页面加载时检查过期标签并加载
-window.addEventListener('load', () => {
-  loadTagsFromLocalStorage();
+// 清空按钮
+clearContentBtn.addEventListener('click', () => {
+  mdSource.value = '';
+  localStorage.removeItem('draftMdSource');
+  contentPreview.innerHTML = '';
+  updateSaveButtonState();
+  showSaveNotification('内容已清空');
 });
 
-// 清空按钮点击事件
-clearContentBtn.addEventListener('click', () => {
-  // 清空内容区域
-  contentArea.innerHTML = '输入内容...';
-  // 更新保存按钮状态
-  updateSaveButtonState();
-  // 显示清空成功提示
-  showSaveNotification('内容已清空');
+// 一键配置功能
+quickConfigBtn.addEventListener('click', () => {
+  apiModal.classList.remove('show');
+  quickConfigModal.classList.add('show');
+  credentialInput.value = '';
+});
+
+closeQuickConfigBtn.addEventListener('click', () => {
+  quickConfigModal.classList.remove('show');
+});
+
+quickConfigModal.addEventListener('click', (e) => {
+  if (e.target === quickConfigModal) {
+    quickConfigModal.classList.remove('show');
+  }
+});
+
+// 获取凭证按钮
+getCredentialBtn.addEventListener('click', () => {
+  chrome.tabs.create({ url: 'https://ima.qq.com/agent-interface' });
+});
+
+// 应用按钮
+applyQuickConfigBtn.addEventListener('click', () => {
+  const input = credentialInput.value.trim();
+  
+  if (!input) {
+    showCustomAlert('请输入凭证信息');
+    return;
+  }
+  
+  // 解析凭证
+  const apiKeyMatch = input.match(/API\s*Key[:\s]*(.+)/i);
+  const clientIdMatch = input.match(/Client\s*ID[:\s]*(.+)/i);
+  
+  if (!apiKeyMatch || !clientIdMatch) {
+    showCustomAlert('格式错误，请按照示例格式粘贴');
+    return;
+  }
+  
+  const extractedApiKey = apiKeyMatch[1].trim();
+  const extractedClientId = clientIdMatch[1].trim();
+  
+  // 填入表单
+  apiKeyInput.value = extractedApiKey;
+  clientIdInput.value = extractedClientId;
+  
+  // 保存到 localStorage
+  localStorage.setItem('imaClientId', extractedClientId);
+  localStorage.setItem('imaApiKey', extractedApiKey);
+  
+  // 关闭一键配置弹窗
+  quickConfigModal.classList.remove('show');
+  showSaveNotification('配置已应用');
+  
+  // 刷新知识库列表
+  fetchKnowledgeBases();
 });
