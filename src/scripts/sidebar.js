@@ -358,7 +358,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const wasEmpty = !mdSource.value.trim();
     
     // 追加到 mdSource textarea
-    mdSource.value += fullContent;
+    if (wasEmpty) {
+      mdSource.value = fullContent;
+    } else {
+      mdSource.value += '\n\n' + fullContent;
+    }
     
     // 如果内容为空，切换到预览模式；否则保持当前状态
     if (wasEmpty) {
@@ -395,7 +399,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       fullContent += `\n\n---\n\n> 来自：[${pageInfo.title}] |「URL」${pageInfo.url}`;
     }
     
-    mdSource.value = fullContent;
+    // 检查追加前内容是否为空
+    const wasEmpty = !mdSource.value.trim();
+    
+    // 追加到 mdSource textarea
+    if (wasEmpty) {
+      mdSource.value = fullContent;
+    } else {
+      mdSource.value += '\n\n' + fullContent;
+    }
     
     if (isMdMode) {
       renderPreview();
@@ -553,7 +565,7 @@ document.addEventListener('click', (e) => {
 
 // 设置
 settingsItem.addEventListener('click', () => {
-  const settingsUrl = chrome.runtime.getURL('settings.html');
+  const settingsUrl = chrome.runtime.getURL('src/pages/settings.html');
   chrome.tabs.create({ url: settingsUrl });
   menuDropdown.classList.remove('show');
 });

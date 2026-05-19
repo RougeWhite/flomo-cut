@@ -1,0 +1,10 @@
+{
+  "extension_name": {
+    "message": "IMA笔记",
+    "description": "插件名称"
+  },
+  "extension_description": {
+    "message": "选取网页内容并保存到 IMA 知识库",
+    "description": "插件描述"
+  }
+}

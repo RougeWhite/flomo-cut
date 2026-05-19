@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IMA笔记 - 设置</title>
+  <link rel="stylesheet" href="../styles/sidebar.css">
+  <link rel="stylesheet" href="../styles/settings.css">
+</head>
+<body>
+  <div class="settings-layout">
+    <div class="settings-sidebar">
+      <div class="settings-sidebar-header">
+        <h2>设置</h2>
+      </div>
+      <nav class="settings-nav">
+        <div class="settings-nav-item active" data-section="general">
+          <span class="nav-text">常规</span>
+        </div>
+        <div class="settings-nav-item" data-section="ima-config">
+          <span class="nav-text">IMA 配置</span>
+        </div>
+        <div class="settings-nav-item" data-section="about">
+          <span class="nav-text">关于</span>
+        </div>
+      </nav>
+    </div>
+    
+    <div class="settings-main">
+      <div class="settings-content">
+      <div id="section-general" class="settings-section active">
+        <h3>常规设置</h3>
+        
+        <div class="setting-item">
+          <label class="setting-label">
+            <input type="checkbox" id="auto-preview" checked>
+            <span>选取后自动进入预览模式</span>
+          </label>
+          <p class="setting-desc">当内容为空时，选取确认后自动切换到预览模式</p>
+        </div>
+        
+        <div class="setting-item">
+          <label class="setting-label">
+            <input type="checkbox" id="save-draft" checked>
+            <span>自动保存草稿</span>
+          </label>
+          <p class="setting-desc">自动保存输入内容到本地缓存</p>
+        </div>
+        
+        <div class="setting-item">
+          <label class="setting-label">
+            <input type="checkbox" id="dblclick-edit">
+            <span>双击切换至编辑状态</span>
+          </label>
+          <p class="setting-desc">在预览模式下双击内容切换到编辑模式</p>
+        </div>
+      </div>
+      
+      <div id="section-ima-config" class="settings-section">
+        <h3>IMA 配置</h3>
+        
+        <div class="form-group">
+          <label for="client-id">Client ID</label>
+          <input type="text" id="client-id" class="api-input" placeholder="请输入 Client ID">
+        </div>
+        
+        <div class="form-group">
+          <label for="api-key">API Key</label>
+          <input type="password" id="api-key" class="api-input" placeholder="请输入 API Key">
+        </div>
+        
+        <p class="api-hint">
+          获取方式：打开 <a href="https://ima.qq.com/agent-interface" target="_blank">ima.qq.com/agent-interface</a> 
+          获取 Client ID 和 API Key
+        </p>
+        
+        <div class="section-actions">
+          <button id="save-ima-config" class="save-btn">保存 IMA 配置</button>
+        </div>
+      </div>
+      
+      <div id="section-about" class="settings-section">
+        <div class="about-header">
+          <img src="../assets/icons/icon128.png" class="about-icon" alt="插件图标">
+          <div class="about-title">
+            <h3>IMA笔记</h3>
+            <p class="version">v1.0</p>
+          </div>
+        </div>
+        
+        <p class="about-desc">一个用于选取网页内容并保存到 IMA 知识库的浏览器插件</p>
+        
+        <div class="card author-card">
+          <h4>关于作者</h4>
+          <div class="author-content">
+            <img src="../assets/images/author.jpg" class="author-avatar" alt="作者头像">
+            <div class="author-info">
+              <p class="author-name">white</p>
+              <a href="https://github.com/RougeWhite/flomo-cut" target="_blank" class="github-link">
+                <span class="github-icon">GitHub</span>
+              </a>
+            </div>
+          </div>
+        </div>
+        
+        <div class="card donate-card">
+          <h4>支持一下</h4>
+          <p class="donate-tip">您的支持是我持续更新的动力</p>
+          <div class="donate-qrcodes">
+            <img src="../assets/images/wx.jpg" alt="微信收款码" class="donate-img">
+            <img src="../assets/images/zfb.jpg" alt="支付宝收款码" class="donate-img">
+          </div>
+        </div>
+      </div>
+      </div>
+      
+      <div class="settings-footer">
+        <div class="settings-actions">
+          <button id="save-settings" class="save-btn">保存设置</button>
+          <button id="close-settings" class="btn-secondary">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script src="../scripts/settings.js"></script>
+</body>
+</html>
